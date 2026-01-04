@@ -529,7 +529,7 @@ Func Party_IsEntirePartyAlive()
     Next
 
     ; --- Vérifie les henchmen ---
-    Local $henchCount = Party_GetMyPartyInfo("ArrayHenchmanPartyMemberSize")
+    Local $henchCount = Party_GetMyPartyInfo("Ar9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8")
     For $i = 1 To $henchCount
         Local $agentID = Party_GetMyPartyHenchmanInfo($i, "AgentID")
         If $agentID = 0 Then ContinueLoop
@@ -1041,7 +1041,7 @@ Func Powerup2()
     If GetPartyDefeated() Then Return
 
     ; --- Conset
-    If GUICtrlRead($PconsBox) = $GUI_CHECKED Then
+    If GUICtrlRead($PconsBox2) = $GUI_CHECKED Then
         If FindConset() Then
             UseConset()
             Out("Activate Cons")
@@ -1051,7 +1051,7 @@ Func Powerup2()
     EndIf
 
     ; --- Summoning stone
-    If GUICtrlRead($Summon1) = $GUI_CHECKED Then
+    If GUICtrlRead($Summon2) = $GUI_CHECKED Then
         If UseSummoningStone() Then
             ; UseSummoningStone log déjà "✨ Summoning Stone used!"
         Else
