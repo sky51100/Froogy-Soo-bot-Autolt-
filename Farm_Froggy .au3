@@ -254,7 +254,6 @@ Func GoToDungeon()
 
     ; === Get Asura Blessing ===
     Out("Moving to Asura beacon")
-Powerup()	
 DoStep(1,-8950.00, -19843)
     Out("Getting Asura Blessing")
     Sleep(250)
