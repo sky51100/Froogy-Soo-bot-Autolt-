@@ -6,8 +6,8 @@
 #ce
 
 #RequireAdmin
-#include "C:\Users\yoann\Desktop\GW & co\2025\GwAu3\API\_GwAu3.au3"
-#include "C:\Users\yoann\Desktop\GW & co\2025\GwAu3\Scripts\AddOns\GwAu3_AddOns_Froggy.au3"
+#include "yourpath\GwAu3\API\_GwAu3.au3"
+#include "yourpath\GwAu3\Scripts\AddOns\GwAu3_AddOns_Froggy.au3"
 
 ; === Options ===
 Global Const $doLoadLoggedChars = True
@@ -38,7 +38,7 @@ For $i = 1 To $CmdLine[0]
 Next
 
 ; ------------- GUI --------------
-#include "C:\Users\yoann\Desktop\GW & co\2025\GwAu3\Scripts\GUI\Gui_Froggy.au3"
+#include "yourpath\GwAu3\Scripts\GUI\Gui_Froggy.au3"
 
 ; Auto-start logic if character name was provided via command line
 If $g_bAutoStart And $charName <> "" Then
@@ -284,7 +284,9 @@ DoStep(19, -5803, -3775, "aggro")
 DoStep(20, -5119, -3033, "aggro")
 DoStep(21, -4271, -2488, "aggro")
 DoStep(22, -3291, -2251, "aggro")
+Sleep(3000)
 DoStep(23, -2497, -1638, "aggro")
+Sleep(3000)
 DoStep(24, -1775, -943, "aggro")
 DoStep(25, -1028, -270, "aggro")
 DoStep(26, -283, 401, "aggro")

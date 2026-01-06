@@ -529,7 +529,7 @@ Func Party_IsEntirePartyAlive()
     Next
 
     ; --- Vérifie les henchmen ---
-    Local $henchCount = Party_GetMyPartyInfo("Ar9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8")
+    Local $henchCount = Party_GetMyPartyInfo("ArrayHenchmanPartyMemberSize")
     For $i = 1 To $henchCount
         Local $agentID = Party_GetMyPartyHenchmanInfo($i, "AgentID")
         If $agentID = 0 Then ContinueLoop
@@ -562,7 +562,6 @@ EndFunc
 ;  Gestion d’un step unique (avec détection de mort et reprise automatique)
 ;  Version corrigée : conversion step->index, pas d'enregistrement multiple
 ; ========================================================================
-Global $gAbortCurrentStep = False
 
 Global $gAbortCurrentStep = False
 
@@ -688,7 +687,7 @@ Func DoStep($stepId, $x, $y, $mode="aggro")
 ; --------------------------------------------------
 ; 🗝️ Opportunistic Chest Opening (Option A)
 ; --------------------------------------------------
-If $ChestFarmActive Then
+If $ChestFarmActive And GUICtrlRead($chkChestFarm) = $GUI_CHECKED Then
     If TimerDiff($gLastChestCheck) > 750 Then
         $gLastChestCheck = TimerInit()
         OpenNearbyChestsFiltered()
@@ -848,17 +847,26 @@ EndFunc
 Func WaitForStabilization($duration = 6000)
     Local $tStart = TimerInit()
     While TimerDiff($tStart) <= $duration
-        If Agent_GetAgentInfo(-2,"IsDead") Then Return False
+        If Agent_GetAgentInfo(-2, "IsDead") Then Return False
         Sleep(250)
     WEnd
+
+    ; ➕ Vérification post-stabilisation (3 secondes critiques)
+    Local $tBuffer = TimerInit()
+    While TimerDiff($tBuffer) <= 3000
+        If Agent_GetAgentInfo(-2, "IsDead") Then Return False
+        Sleep(250)
+    WEnd
+
     Return True
 EndFunc
+
 
 Func HandleDeath($iLastStepID)
     ; ------------------------------------------------------------
     ; Attente de résurrection
     ; ------------------------------------------------------------
-    While Agent_GetAgentInfo(-2,"IsDead")
+    While Agent_GetAgentInfo(-2, "IsDead")
         Sleep(2000)
     WEnd
 
@@ -875,7 +883,6 @@ Func HandleDeath($iLastStepID)
     ; Détection sanctuaire (avec retry)
     ; ------------------------------------------------------------
     Local $iRezSanctStepID = GetNearestSanctStep()
-    Local $bRezFromSanct = False
 
     If $iRezSanctStepID = -1 Then
         For $i = 1 To 5
@@ -885,33 +892,46 @@ Func HandleDeath($iLastStepID)
         Next
     EndIf
 
-    If $iRezSanctStepID <> -1 Then
-        $bRezFromSanct = True
-        Out("📍 Sanctuaire détecté → step " & $iRezSanctStepID)
-    Else
+    ; ============================================================
+    ; CAS 1 : RÉSURRECTION SUR PLACE (APPARENTE)
+    ; ============================================================
+    If $iRezSanctStepID = -1 Then
         Out("⚡ Résurrection sur place → reprise directe sans replay.")
+
         Local $aPos = GetPlayerXY()
         Local $iNearest = _GetNearestStepIndex(Map_GetMapID(), $aPos[0], $aPos[1])
         If $iNearest < 0 Then $iNearest = 0
         $iCurrentStep = $iNearest
 
-        Out("🔎 Vérification de reposition post-rez...")
-        Sleep(2000)
+        Out("🔎 Vérification renforcée post-rez...")
+        Sleep(2500)
+
+        ; 🔁 Détection sanctuaire tardive (cas wipe immédiat)
         Local $iLate = GetNearestSanctStep()
         If $iLate <> -1 Then
-            Out("📍 Correction : rez au sanctuaire détecté tardivement (step " & $iLate & ")")
-            $iCurrentStep = _GetStepIndexByID($iLate)
-            If $iCurrentStep < 0 Then $iCurrentStep = 0
-        Else
-            Out("✅ Vérification terminée : toujours considéré comme rez sur place.")
+            Out("📍 Sanctuaire détecté tardivement (step " & $iLate & ") → re-traitement mort")
+            Return HandleDeath($iLastStepID)
         EndIf
 
+        ; 🔁 Détection téléportation brutale
+        Local $aCurPos = GetPlayerXY()
+        Local $aStep = $aSteps[$iCurrentStep]
+        Local $fDist = Sqrt(($aCurPos[0] - $aStep[1])^2 + ($aCurPos[1] - $aStep[2])^2)
+
+        If $fDist > 3000 Then
+            Out("📍 Téléportation détectée post-rez (" & Int($fDist) & " unités) → re-traitement mort")
+            Return HandleDeath($iLastStepID)
+        EndIf
+
+        Out("✅ Rez sur place confirmé comme valide.")
         Return $iCurrentStep
     EndIf
 
-    ; ------------------------------------------------------------
-    ; Cas sanctuaire : replay des steps jusqu’à $iLastStepID
-    ; ------------------------------------------------------------
+    ; ============================================================
+    ; CAS 2 : RÉSURRECTION AU SANCTUAIRE
+    ; ============================================================
+    Out("📍 Sanctuaire détecté → step " & $iRezSanctStepID)
+
     Local $iResumeIndex = _GetStepIndexByID($iRezSanctStepID)
     If $iResumeIndex < 0 Then $iResumeIndex = 0
 
@@ -924,7 +944,7 @@ Func HandleDeath($iLastStepID)
         Return $iCurrentStep
     EndIf
 
-    Out("🔁 Rejoue les steps depuis le sanctuaire (step " & $iRezSanctStepID & ") jusqu’à la mort (" & $iLastStepID & ")")
+    Out("🔁 Rejoue les steps depuis le sanctuaire jusqu’à la mort")
     $iCurrentStep = $iResumeIndex
 
     For $i = ($iResumeIndex + 1) To ($iLastIndex - 1)
@@ -941,17 +961,23 @@ Func HandleDeath($iLastStepID)
     $iCurrentStep = $iLastIndex - 1
     Out("↪️ Reprise finale au step " & $aSteps[$iCurrentStep][0])
 
-    ; 🔁 Vérif post-reprise élargie
-    Out("🩺 Vérification post-reprise : mort dans les secondes qui suivent ?")
+    ; ------------------------------------------------------------
+    ; Vérification post-reprise
+    ; ------------------------------------------------------------
+    Out("🩺 Vérification post-reprise : stabilité...")
     If Not WaitForStabilization(6000) Then
-        Out("💀 Mort détectée immédiatement après reprise — relance HandleDeath()")
+        Out("💀 Mort détectée après reprise — relance HandleDeath()")
         Return HandleDeath($iLastStepID)
     EndIf
 
-    Out("✅ Vérification post-reprise terminée : état stable.")
+    Out("✅ Reprise stable confirmée.")
     Return $iCurrentStep
 EndFunc
 
+
+Func Distance($x1, $y1, $x2, $y2)
+    Return Sqrt(($x2 - $x1)^2 + ($y2 - $y1)^2)
+EndFunc
 
 Func _MoveByMode($x, $y, $mode)
     Switch StringLower($mode)
