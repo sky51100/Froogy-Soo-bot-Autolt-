@@ -6,8 +6,8 @@
 #ce
 
 #RequireAdmin
-#include "yourpath\GwAu3\API\_GwAu3.au3"
-#include "yourpath\GwAu3\Scripts\AddOns\GwAu3_AddOns_Froggy.au3"
+#include "Yourpath\GwAu3\API\_GwAu3.au3"
+#include "Yourpath\GwAu3\Scripts\AddOns\GwAu3_AddOns_Froggy.au3"
 
 ; === Options ===
 Global Const $doLoadLoggedChars = True
@@ -38,7 +38,7 @@ For $i = 1 To $CmdLine[0]
 Next
 
 ; ------------- GUI --------------
-#include "yourpath\GwAu3\Scripts\GUI\Gui_Froggy.au3"
+#include "Yourpath\GwAu3\Scripts\GUI\Gui_Froggy.au3"
 
 ; Auto-start logic if character name was provided via command line
 If $g_bAutoStart And $charName <> "" Then
@@ -93,9 +93,9 @@ WEnd
 #Region === Core Farming Loop ===
 ; ===========================================
 Func MainFarm()
-    Setup()
-    GoToDungeon()
-    TakeQuest()
+;    Setup()
+;    GoToDungeon()
+;    TakeQuest()
     EnterFirstRun()
     CombatLoop()
 EndFunc ;==> MainFarm
@@ -425,38 +425,35 @@ EndFunc
 #Region === Stages ===
 ; ===========================================
 Func EnterFirstRun()
-    Do
         MoveTo(11676.01, 22685)
         MoveTo(11562.77, 24059)
         MoveTo(13097, 26393)
-    Until Map_GetMapID() = $iBogrootGrowthsLevel1MapID
+    Map_WaitMapLoading($iBogrootGrowthsLevel1MapID)
 Out("Enter !!")
-    If Map_GetMapID() = $iBogrootGrowthsLevel1MapID Then
-        Out("Mission Map loaded")
-        Sleep(2000)
-        Out("Dungeon Ready")
-    Else
-        Out("Mission Map not loaded")
-    EndIf
 EndFunc ;==> EnterFirstRun
 
 
 Func FirstStage()
-    $RunTimer = TimerInit() ; ✅ Start chrono
-; === Vérifier si la quête est active ===
+    Local $RunTimer = TimerInit() ; ✅ Start chrono
+
+    ; === Vérifier si la quête est active ===
     Local $questID = 0x339 ; ID de la quête
     If Not Quest_GetQuestInfo($questID, "QuestID") Then
-        ; Si la quête n'est pas active, on reprend la quête et réentre dans le donjon
+        ; Si la quête n'est pas active, on reprend la quête et on réentre dans le donjon
         RetakeQuest()
-        Return ; Sortir de la fonction pour éviter d'exécuter le reste avant de retourner dans le donjon
+        Return ; On quitte la fonction, car on va relancer la séquence après avoir repris la quête
     EndIf
 
-; Si la quête est active, on continue normalement
-If Map_GetMapID() <> $iBogrootGrowthsLevel1MapID Then
-    Do
-        Sleep(500)
-    Until Map_GetMapID() == $iBogrootGrowthsLevel1MapID
-EndIf
+    ; === Vérifier que la map est bien chargée ===
+    If Map_GetMapID() <> $iBogrootGrowthsLevel1MapID Then
+        Out("Mission Map not loaded")
+        Do
+            Sleep(500)
+        Until Map_GetMapID() == $iBogrootGrowthsLevel1MapID
+        Sleep(2000)
+    EndIf
+	Out("Mission Map loaded")
+
 
 	    Out("Aggro Frog Fight")
     DoStep(1, 18092, 4315, "aggro")
