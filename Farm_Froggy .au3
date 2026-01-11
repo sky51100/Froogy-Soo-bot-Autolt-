@@ -6,8 +6,8 @@
 #ce
 
 #RequireAdmin
-#include "Yourpath\GwAu3\API\_GwAu3.au3"
-#include "Yourpath\GwAu3\Scripts\AddOns\GwAu3_AddOns_Froggy.au3"
+#include "yourpath\GwAu3\API\_GwAu3.au3"
+#include "yourpath\GwAu3\Scripts\AddOns\GwAu3_AddOns_Froggy.au3"
 
 ; === Options ===
 Global Const $doLoadLoggedChars = True
@@ -38,7 +38,7 @@ For $i = 1 To $CmdLine[0]
 Next
 
 ; ------------- GUI --------------
-#include "Yourpath\GwAu3\Scripts\GUI\Gui_Froggy.au3"
+#include "yourpath\GwAu3\Scripts\GUI\Gui_Froggy.au3"
 
 ; Auto-start logic if character name was provided via command line
 If $g_bAutoStart And $charName <> "" Then
@@ -93,9 +93,9 @@ WEnd
 #Region === Core Farming Loop ===
 ; ===========================================
 Func MainFarm()
-;    Setup()
-;    GoToDungeon()
-;    TakeQuest()
+    Setup()
+    GoToDungeon()
+    TakeQuest()
     EnterFirstRun()
     CombatLoop()
 EndFunc ;==> MainFarm
