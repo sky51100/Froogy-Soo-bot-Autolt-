@@ -434,7 +434,7 @@ EndFunc ;==> EnterFirstRun
 
 
 Func FirstStage()
-    Local $RunTimer = TimerInit() ; ✅ Start chrono
+    Global $RunTimer = TimerInit() ; ✅ Start chrono
 
     ; === Vérifier si la quête est active ===
     Local $questID = 0x339 ; ID de la quête
