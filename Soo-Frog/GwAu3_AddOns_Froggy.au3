@@ -416,6 +416,13 @@ Func GetNearestSignpostToAgent($aAgentID = -2, $aRange = 1320, $aReturnMode = 1,
     Return Agent_GetAgentInfo($ptr, "ID")
 EndFunc
 
+Func _InteractSignpostSequence()
+    Agent_TargetNearestGadget()
+    Sleep(Other_GetPing() + 500)
+    Agent_GoSignpost(Agent_TargetNearestGadget())
+    Sleep(Other_GetPing() + 500)
+    Agent_GoSignpost(Agent_TargetNearestGadget())
+EndFunc
 
 ; ==========================
 ; Vérifie si le bot est dans un état "safe" pour continuer
@@ -935,7 +942,7 @@ Func HandleDeath($iLastStepID)
     If $iRezSanctStepID = -1 Then
         ; Fallback zone extérieure connue
         Switch Map_GetMapID()
-            Case $MAP_ID_OUTSIDE_BOGROOT
+            Case $iSplarkflyMapID
                 $iRezSanctStepID = 1
                 Out("📍 Aucun sanctuaire détecté — fallback activé (zone extérieure Bogroot)")
         EndSwitch
@@ -1150,6 +1157,16 @@ Func Powerup2()
     EndIf
 EndFunc
 
+Func legion()
+    If GetPartyDefeated() Then Return
+    ; --- Summoning stone
+    If GUICtrlRead($Summon2) = $GUI_CHECKED Then
+        If UseSummoningStone() Then
+        Else
+            Out("❌ No summoning stone used")
+        EndIf
+    EndIf
+EndFunc
 
 Func FindConset()
 	Local $lItemPtr
@@ -1465,7 +1482,7 @@ Func AggroMoveToEx($x, $y, $s = "", $z = 1200)
             While Not Party_IsEntirePartyAlive()
                 Sleep(2000)
                 If TimerDiff($wait) > 20000 Then
-                    Out("⏰ Timeout : toujours un membre mort après 60s → reprise forcée.")
+                    Out("⏰ Timeout : toujours un membre mort après 20s → reprise forcée.")
                     ExitLoop
                 EndIf
             WEnd
