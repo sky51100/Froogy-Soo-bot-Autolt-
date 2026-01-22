@@ -612,13 +612,10 @@ Func LastStep()
     PickupLoot()
     Out("Open Boss Door")
 			MoveTo(17888, -6243)
-				Sleep(Other_GetPing() + 500)
-    Agent_GoSignpost(Agent_TargetNearestGadget())
-
-				Sleep(Other_GetPing() + 500)
-				Agent_GoSignpost(Agent_TargetNearestGadget())
+			Sleep(1000)
+_InteractSignpostSequence()
     Out("Door Opened")
-    
+legion()
     ; === Boss Waypoints ===    
 DoStep(88, 17623.87, -6546, "move")	
 DoStep(89, 18024, -9191, "aggro")
@@ -642,10 +639,7 @@ DoStep(99, 15116.40, -18733, "aggro")
     ; === Chest & Loot ===
     Out("Bogroot Chest")
     MoveTo(14982.66, -19122)
-	Sleep(Other_GetPing() + 500)
-	Agent_GoSignpost(Agent_TargetNearestGadget())
-	Sleep(Other_GetPing() + 500)
-	Agent_GoSignpost(Agent_TargetNearestGadget())
+_InteractSignpostSequence()
 
 
 
