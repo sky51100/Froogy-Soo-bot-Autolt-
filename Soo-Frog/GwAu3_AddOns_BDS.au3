@@ -366,10 +366,44 @@ Func GetPartyDefeated()
 	Return Party_GetPartyContextInfo("IsDefeated")
 EndFunc ;==> GetPartyDefeated
 
+Func Agent_TargetNearestGadget($a_f_MaxDistance = 300)
+    Local $l_i_NearestID = 0
+    Local $l_f_NearestDistance = $a_f_MaxDistance
+    Local $l_i_MyID = Agent_GetMyID()
+    Local $l_i_MaxAgents = Agent_GetMaxAgents()
 
-Func GetNearestSignpostToAgent($aAgentID = -2, $aRange = 1000, $aReturnMode = 1, $aCustomFilter = "")
-    Return GetAgents($aAgentID, $aRange, $GC_I_AGENT_TYPE_GADGET, $aReturnMode, $aCustomFilter)
-EndFunc ;==>GetNearestSignpostToAgent
+    For $i = 1 To $l_i_MaxAgents
+        Local $l_p_Pointer = Agent_GetAgentPtr($i)
+        If $l_p_Pointer = 0 Then ContinueLoop
+
+        If Agent_GetAgentInfo($l_p_Pointer, "IsDead") Then ContinueLoop
+
+        Local $l_i_Type = Agent_GetAgentInfo($i, "Type")
+        If $l_i_Type <> $GC_I_AGENT_TYPE_GADGET Then ContinueLoop
+
+        Local $l_f_Distance = Agent_GetDistance($i, $l_i_MyID)
+        If $l_f_Distance < $l_f_NearestDistance Then
+            $l_f_NearestDistance = $l_f_Distance
+            $l_i_NearestID = $i
+        EndIf
+    Next
+
+    If $l_i_NearestID > 0 Then
+        Agent_ChangeTarget($l_i_NearestID)
+        Log_Debug("Targeted nearest gadget: " & $l_i_NearestID & " at distance: " & $l_f_NearestDistance, "AgentMod", $g_h_EditText)
+    Else
+        Log_Debug("No gadget found within range: " & $a_f_MaxDistance, "AgentMod", $g_h_EditText)
+    EndIf
+
+    Return $l_i_NearestID
+EndFunc
+
+
+Func GetNearestSignpostToAgent($aAgentID = -2, $aRange = 1320, $aReturnMode = 1, $aCustomFilter = "IsGadgetType")
+    Local $ptr = GetAgents($aAgentID, $aRange, $GC_I_AGENT_TYPE_GADGET, $aReturnMode, $aCustomFilter)
+    If $ptr <= 0 Then Return 0
+    Return Agent_GetAgentInfo($ptr, "ID")
+EndFunc
 
 
 Func HasDeathPenalty()
@@ -523,7 +557,7 @@ Func Party_IsEntirePartyAlive()
     Next
 
     ; --- Vérifie les henchmen ---
-    Local $henchCount = Party_GetMyPartyInfo("ArrayHenchmanPartyMemberSize")
+    Local $henchCount = Party_GetMyPartyInfo("Ar9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8")
     For $i = 1 To $henchCount
         Local $agentID = Party_GetMyPartyHenchmanInfo($i, "AgentID")
         If $agentID = 0 Then ContinueLoop
