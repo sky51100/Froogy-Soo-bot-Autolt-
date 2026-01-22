@@ -891,7 +891,7 @@ EndFunc
 
 
 
-Func WaitForStabilization($duration = 6000)
+Func WaitForStabilization($duration = 10000)
     Local $tStart = TimerInit()
     While TimerDiff($tStart) <= $duration
         If Agent_GetAgentInfo(-2, "IsDead") Then Return False
@@ -908,17 +908,21 @@ Func WaitForStabilization($duration = 6000)
     Return True
 EndFunc
 
+Global $g_iDeathLoopCount = 0
+
+Func Map_IsDungeon()
+    Local $iMapID = Map_GetMapID()
+    Return ($iMapID = $iBogrootGrowthsLevel1MapID Or $iMapID = $iBogrootGrowthsLevel2MapID)
+EndFunc
+
 
 Func HandleDeath($iLastStepID)
-    ; ------------------------------------------------------------
-    ; Attente de résurrection
-    ; ------------------------------------------------------------
     While Agent_GetAgentInfo(-2, "IsDead")
         Sleep(2000)
     WEnd
 
     Out("💀 Résurrection détectée → attente de stabilisation...")
-    If Not WaitForStabilization(6000) Then
+    If Not WaitForStabilization(10000) Then
         Out("❌ Nouvelle mort détectée durant la stabilisation — relance HandleDeath()")
         Return HandleDeath($iLastStepID)
     EndIf
@@ -926,25 +930,20 @@ Func HandleDeath($iLastStepID)
 
     DPRemoval()
 
-    ; ------------------------------------------------------------
-    ; Détection sanctuaire (avec retry)
-    ; ------------------------------------------------------------
+    ; Détection sanctuaire
     Local $iRezSanctStepID = GetNearestSanctStep()
-
     If $iRezSanctStepID = -1 Then
-        For $i = 1 To 5
-            Sleep(1000)
-            $iRezSanctStepID = GetNearestSanctStep()
-            If $iRezSanctStepID <> -1 Then ExitLoop
-        Next
+        ; Fallback zone extérieure connue
+        Switch Map_GetMapID()
+            Case $MAP_ID_OUTSIDE_BOGROOT
+                $iRezSanctStepID = 1
+                Out("📍 Aucun sanctuaire détecté — fallback activé (zone extérieure Bogroot)")
+        EndSwitch
     EndIf
 
-    ; ============================================================
-    ; CAS 1 : RÉSURRÉCTION SUR PLACE (APPARENTE)
-    ; ============================================================
+    ; === CAS 1 : Rez sur place ===
     If $iRezSanctStepID = -1 Then
         Out("⚡ Résurrection sur place → reprise directe sans replay.")
-
         Local $aPos = GetPlayerXY()
         Local $iNearest = _GetNearestStepIndex(Map_GetMapID(), $aPos[0], $aPos[1])
         If $iNearest < 0 Then $iNearest = 0
@@ -953,38 +952,22 @@ Func HandleDeath($iLastStepID)
         Out("🔎 Vérification renforcée post-rez...")
         Sleep(2500)
 
-        ; 🔁 Détection sanctuaire tardive (cas wipe immédiat)
+        ; Détection sanctuaire tardive
         Local $iLate = GetNearestSanctStep()
         If $iLate <> -1 Then
             Out("📍 Sanctuaire détecté tardivement (step " & $iLate & ") → re-traitement mort")
             Return HandleDeath($iLastStepID)
         EndIf
 
-        ; 🔁 Détection téléportation brutale
+        ; Vérification téléportation brutale
         Local $aCurPos = GetPlayerXY()
-        If $iCurrentStep >= 0 And $iCurrentStep < UBound($aSteps, 1) Then
-		Local $aStep = [ _
-			$aSteps[$iCurrentStep][0], _
-			$aSteps[$iCurrentStep][1], _
-			$aSteps[$iCurrentStep][2], _
-			$aSteps[$iCurrentStep][3] _
-]
-
-        Else
-            Out("ERREUR: $iCurrentStep hors limites → " & $iCurrentStep & @CRLF)
-            Return $iCurrentStep
-        EndIf
-
+        Local $aStep = $aSteps[$iCurrentStep]
         Local $fDist = Sqrt(($aCurPos[0] - $aStep[1])^2 + ($aCurPos[1] - $aStep[2])^2)
 
-      ; Une fois, dans l'initialisation globale
-Global $g_iDeathLoopCount = 0
+        $g_iDeathLoopCount += 1
 
-; Puis dans ta fonction (n'importe où après)
-$g_iDeathLoopCount += 1
-
-
-        If $fDist > 3000 Then
+        ; Seulement si en donjon, appliquer le test strict
+        If Map_IsDungeon() And $fDist > 3000 Then
             If $g_iDeathLoopCount > 2 Then
                 Out("❌ Trop de détections de téléportation post-rez. On continue malgré un écart de " & Int($fDist) & " unités.")
                 Return $iCurrentStep
@@ -998,14 +981,11 @@ $g_iDeathLoopCount += 1
         Return $iCurrentStep
     EndIf
 
-    ; ============================================================
-    ; CAS 2 : RÉSURRÉCTION AU SANCTUAIRE
-    ; ============================================================
+    ; === CAS 2 : Rez sanctuaire ===
     Out("📍 Sanctuaire détecté → step " & $iRezSanctStepID)
 
     Local $iResumeIndex = _GetStepIndexByID($iRezSanctStepID)
     If $iResumeIndex < 0 Then $iResumeIndex = 0
-
     Local $iLastIndex = _GetStepIndexByID($iLastStepID)
     If $iLastIndex < 0 Then $iLastIndex = $iCurrentStep
 
@@ -1017,7 +997,6 @@ $g_iDeathLoopCount += 1
 
     Out("🔁 Rejoue les steps depuis le sanctuaire jusqu’à la mort")
     $iCurrentStep = $iResumeIndex
-
     For $i = ($iResumeIndex + 1) To ($iLastIndex - 1)
         Local $stepID = $aSteps[$i][0]
         Local $x = $aSteps[$i][1]
@@ -1032,18 +1011,17 @@ $g_iDeathLoopCount += 1
     $iCurrentStep = $iLastIndex - 1
     Out("↪️ Reprise finale au step " & $aSteps[$iCurrentStep][0])
 
-    ; ------------------------------------------------------------
-    ; Vérification post-reprise
-    ; ------------------------------------------------------------
     Out("🦥 Vérification post-reprise : stabilité...")
-    If Not WaitForStabilization(6000) Then
+    If Not WaitForStabilization(10000) Then
         Out("💀 Mort détectée après reprise — relance HandleDeath()")
         Return HandleDeath($iLastStepID)
     EndIf
 
+    $g_iDeathLoopCount = 0
     Out("✅ Reprise stable confirmée.")
     Return $iCurrentStep
 EndFunc
+
 
 Func HandleHighDP()
     $gRestartCount += 1
@@ -1482,11 +1460,11 @@ Func AggroMoveToEx($x, $y, $s = "", $z = 1200)
     Do
         ; 🧠 Nouvelle vérification : attente du groupe vivant
         If Not Party_IsEntirePartyAlive() Then
-            Out("☠️ Un membre du groupe est mort → attente de résurrection avant de continuer (AggroMoveToEx)")
+            Out("☠️ Un membre du groupe est mort → attente de résurrection avant de continuer")
             Local $wait = TimerInit()
             While Not Party_IsEntirePartyAlive()
-                Sleep(1000)
-                If TimerDiff($wait) > 60000 Then
+                Sleep(2000)
+                If TimerDiff($wait) > 20000 Then
                     Out("⏰ Timeout : toujours un membre mort après 60s → reprise forcée.")
                     ExitLoop
                 EndIf
