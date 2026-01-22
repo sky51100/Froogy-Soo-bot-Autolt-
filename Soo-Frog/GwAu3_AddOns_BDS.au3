@@ -1126,6 +1126,7 @@ Func _GetBraziers_Lvl2_Part2()
 	_InteractSignpostSequence()
 
 	Out("🏁 Séquence terminée — Niveau 2 / Partie 2")
+    DropTorch()	
 EndFunc
 
 
@@ -5643,6 +5644,21 @@ Func WaitForMapLoad($iTargetMapID, $iTimeout = 30000)
 	Until False
 EndFunc
 
+Func WaitForMapLoad2($iTargetMapID, $aMoveX, $aMoveY, $iMaxRetries = 3, $iTimeout = 30000)
+    For $i = 1 To $iMaxRetries
+        Out("🔁 Tentative " & $i & " de chargement vers la map ID " & $iTargetMapID)
+        MoveTo($aMoveX, $aMoveY)
+        If WaitForMapLoad($iTargetMapID, $iTimeout) Then
+            Out("✅ Map ID " & $iTargetMapID & " chargée avec succès.")
+            Return True
+        EndIf
+        Out("❌ Tentative " & $i & " échouée. Nouvelle tentative dans 2 secondes...")
+        Sleep(2000)
+    Next
+
+    Out("⛔ Échec du chargement après " & $iMaxRetries & " tentatives.")
+    Return False
+EndFunc
 
 
 #Region Gui
