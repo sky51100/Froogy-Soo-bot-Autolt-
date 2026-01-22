@@ -366,7 +366,7 @@ Func GetPartyDefeated()
 	Return Party_GetPartyContextInfo("IsDefeated")
 EndFunc ;==> GetPartyDefeated
 
-Func Agent_TargetNearestGadget($a_f_MaxDistance = 300)
+Func Agent_TargetNearestGadget($a_f_MaxDistance = 800)
     Local $l_i_NearestID = 0
     Local $l_f_NearestDistance = $a_f_MaxDistance
     Local $l_i_MyID = Agent_GetMyID()
@@ -397,6 +397,7 @@ Func Agent_TargetNearestGadget($a_f_MaxDistance = 300)
 
     Return $l_i_NearestID
 EndFunc
+
 
 
 Func GetNearestSignpostToAgent($aAgentID = -2, $aRange = 1320, $aReturnMode = 1, $aCustomFilter = "IsGadgetType")
@@ -998,72 +999,6 @@ Func HandleDeath($lastStep)
 EndFunc
 
 
-; ===========================================================
-; 🔥 Vérifie l’état du brasier
-; ===========================================================
-Func CheckBrazierIsOn($aCurName = "", $aCurX = 0, $aCurY = 0, $aPrevX = 0, $aPrevY = 0)
-	Local $aRange = 1200
-	Local $brazierON = GetNearestBrazierONByModelID(-2, $aRange, $GC_I_AGENT_TYPE_GADGET, 1, "BrazierON")
-
-	; ✅ Si brasier allumé → on continue
-	If $brazierON <> 0 Then
-		Out("✅ " & $aCurName & " est bien allumé — poursuite de la séquence.")
-		Return True
-	EndIf
-
-	; 🕒 Attendre un peu et revérifier
-	Sleep(500)
-	$brazierON = GetNearestBrazierONByModelID(-2, $aRange, $GC_I_AGENT_TYPE_GADGET, 1, "BrazierON")
-	If $brazierON <> 0 Then
-		Out("✅ " & $aCurName & " vient de s’allumer — poursuite de la séquence (test 2).")
-		Return True
-	EndIf
-
-	; ⚠️ Sinon échec → tentative de correction
-	Out("⚠️ " & $aCurName & " non allumé (" & $aCurX & ", " & $aCurY & ") — tentative de correction...")
-
-	; === Cas particulier : premier brasier ===
-	If $aCurX = -11019 And $aCurY = -11550 Then
-		Out("↩️ Chemin alternatif requis (retour via Torch Room).")
-
-		MoveTo(-10033, -12701)
-		Sleep(700)
-		MoveTo(-11248, -14596)
-		Sleep(700)
-		_InteractSignpostSequence()
-		Sleep(700)
-
-		MoveTo(-10033, -12701)
-		Sleep(700)
-		MoveTo($aCurX, $aCurY)
-		_InteractSignpostSequence()
-		Sleep(700)
-
-	ElseIf $aPrevX <> 0 And $aPrevY <> 0 Then
-		; === Cas général ===
-		Out("↩️ Retour au brasier précédent (" & $aPrevX & ", " & $aPrevY & ")")
-		MoveTo($aPrevX, $aPrevY)
-		Sleep(700)
-		_InteractSignpostSequence()
-		Sleep(700)
-
-		Out("🔁 Nouvelle tentative sur " & $aCurName)
-		MoveTo($aCurX, $aCurY)
-		Sleep(700)
-		_InteractSignpostSequence()
-		Sleep(700)
-	EndIf
-
-	; 🔍 Vérifie à nouveau après tentative
-	Local $retry = GetNearestBrazierONByModelID(-2, $aRange, $GC_I_AGENT_TYPE_GADGET, 1, "BrazierON")
-	If $retry <> 0 Then
-		Out("✅ Correction réussie : " & $aCurName & " allumé.")
-		Return True
-	Else
-		Out("❌ Échec persistant : " & $aCurName)
-		Return False
-	EndIf
-EndFunc ;==>CheckBrazierIsOn
 
 Func Debug_LogGadgets($aRange = 2000)
 	Local $lPlayerID = Agent_GetMyID()
@@ -1112,18 +1047,38 @@ EndFunc
 ; 🕯️ Interaction torche / brasier
 ; ===========================================================
 Func _InteractSignpostSequence()
-				Sleep(Other_GetPing() + 500)
-    Agent_GoSignpost(Agent_TargetNearestGadget())
-					Sleep(Other_GetPing() + 500)
-    Agent_GoSignpost(Agent_TargetNearestGadget())
+    Local $id = GetNearestBrazier()
+    If $id <= 0 Then
+        Out("❌ Aucun brasier trouvé.")
+        Return False
+    EndIf
+
+    Local $dist = Agent_GetDistance(-2, $id)
+    Out("🔥 Brasier détecté — ID: " & $id & " | Distance: " & Int($dist))
+
+    If $dist > 350 Then
+        Out("⚠️ Trop loin pour l’interaction.")
+        Return False
+    EndIf
+
+    Agent_ChangeTarget($id)
+    Sleep(Other_GetPing() + 300)
+    Agent_GoSignpost($id)
+    Sleep(Other_GetPing() + 300)
+    Agent_GoSignpost($id)
+
+    Return True
 EndFunc
+
+
+
 ; ===========================================================
 ; 📍 Séquence Braziers — Niveau 2 (Partie 1)
 ; ===========================================================
 Func _GetBraziers_Lvl2_Part1()
 
 	Out("🔥 Allumage de la torche — premier brasier")
-	MoveTo(-11248, -14596)
+	MoveTo(-11303, -14596)
 	_InteractSignpostSequence()
 
 	Out("➡️ Entrée dans la Torch Room")
@@ -2142,19 +2097,18 @@ Func ChestFilter($aAgentPtr)
 	Return False
 EndFunc	;==>ChestFilter
 
-Func BrazierON($aAgentPtr)
-If Agent_GetAgentInfo($aAgentPtr, 'Type') <> 0x200 Then Return False
-    Local $lgadgetID = Agent_GetAgentInfo($aAgentPtr, 'GadgetID')
-    If $lgadgetID = 9170 Then Return True
-    Return False
-EndFunc ;==>BrazierON
+Func IsBrazier($aAgentPtr)
+    If Agent_GetAgentInfo($aAgentPtr, "Type") <> $GC_I_AGENT_TYPE_GADGET Then Return False
+    Local $id = Agent_GetAgentInfo($aAgentPtr, "GadgetID")
+    Return ($id = 9169 Or $id = 9170)
+EndFunc
 
-Func BrazierOFF($aAgentPtr)
-    ; Return True only when the agent is a torch (on or off)
-    Local $lgadgetID = Agent_GetAgentInfo($aAgentPtr, 'GadgetID')
-    If $lgadgetID = 9169 Then Return True
-    Return False
-EndFunc ;==>BrazierOFF
+Func GetNearestBrazier()
+    Local $ptr = GetAgents(-2, 600, $GC_I_AGENT_TYPE_GADGET, 1, "IsBrazier")
+    If $ptr <= 0 Then Return 0
+    Return Agent_GetAgentInfo($ptr, "ID")
+EndFunc
+
 
 Func GetNumberOfLockpicks()
 	Local $ItemModelID, $LockpickQuantity = 0
