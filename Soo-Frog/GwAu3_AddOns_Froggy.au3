@@ -377,10 +377,45 @@ Func GetPartyDefeated()
 	Return Party_GetPartyContextInfo("IsDefeated")
 EndFunc ;==> GetPartyDefeated
 
+Func Agent_TargetNearestGadget($a_f_MaxDistance = 300)
+    Local $l_i_NearestID = 0
+    Local $l_f_NearestDistance = $a_f_MaxDistance
+    Local $l_i_MyID = Agent_GetMyID()
+    Local $l_i_MaxAgents = Agent_GetMaxAgents()
 
-Func GetNearestSignpostToAgent($aAgentID = -2, $aRange = 1320, $aReturnMode = 1, $aCustomFilter = "")
-    Return GetAgents($aAgentID, $aRange, $GC_I_AGENT_TYPE_GADGET, $aReturnMode, $aCustomFilter)
-EndFunc ;==>GetNearestSignpostToAgent
+    For $i = 1 To $l_i_MaxAgents
+        Local $l_p_Pointer = Agent_GetAgentPtr($i)
+        If $l_p_Pointer = 0 Then ContinueLoop
+
+        If Agent_GetAgentInfo($l_p_Pointer, "IsDead") Then ContinueLoop
+
+        Local $l_i_Type = Agent_GetAgentInfo($i, "Type")
+        If $l_i_Type <> $GC_I_AGENT_TYPE_GADGET Then ContinueLoop
+
+        Local $l_f_Distance = Agent_GetDistance($i, $l_i_MyID)
+        If $l_f_Distance < $l_f_NearestDistance Then
+            $l_f_NearestDistance = $l_f_Distance
+            $l_i_NearestID = $i
+        EndIf
+    Next
+
+    If $l_i_NearestID > 0 Then
+        Agent_ChangeTarget($l_i_NearestID)
+        Log_Debug("Targeted nearest gadget: " & $l_i_NearestID & " at distance: " & $l_f_NearestDistance, "AgentMod", $g_h_EditText)
+    Else
+        Log_Debug("No gadget found within range: " & $a_f_MaxDistance, "AgentMod", $g_h_EditText)
+    EndIf
+
+    Return $l_i_NearestID
+EndFunc
+
+
+Func GetNearestSignpostToAgent($aAgentID = -2, $aRange = 1320, $aReturnMode = 1, $aCustomFilter = "IsGadgetType")
+    Local $ptr = GetAgents($aAgentID, $aRange, $GC_I_AGENT_TYPE_GADGET, $aReturnMode, $aCustomFilter)
+    If $ptr <= 0 Then Return 0
+    Return Agent_GetAgentInfo($ptr, "ID")
+EndFunc
+
 
 ; ==========================
 ; Vérifie si le bot est dans un état "safe" pour continuer
@@ -408,6 +443,11 @@ Func HasDeathPenalty()
     Return Party_GetMoraleInfo(-2, "IsMoralePenalty")
 EndFunc
 
+Func GetDP()
+    Return Party_GetMoraleInfo(-2, "IsMoralePenalty")
+EndFunc
+
+
 Func DPRemoval()
     ; Tant qu’il y a un malus de morale
     While Party_GetMoraleInfo(-2, "IsMoralePenalty")
@@ -419,10 +459,17 @@ Func DPRemoval()
         Sleep(500)
     WEnd
 
+    ; Vérification du DP après tentative de retrait
+    If GetDP() >= 60 Then
+        HandleHighDP()
+        Return
+    EndIf
+
     If Not Party_GetMoraleInfo(-2, "IsMoralePenalty") Then
         Out("Death Penalty supprimé")
     EndIf
 EndFunc
+
 
 
 Func UseFirstDPRemoval()
@@ -529,7 +576,7 @@ Func Party_IsEntirePartyAlive()
     Next
 
     ; --- Vérifie les henchmen ---
-    Local $henchCount = Party_GetMyPartyInfo("ArrayHenchmanPartyMemberSize")
+    Local $henchCount = Party_GetMyPartyInfo("Ar9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8")
     For $i = 1 To $henchCount
         Local $agentID = Party_GetMyPartyHenchmanInfo($i, "AgentID")
         If $agentID = 0 Then ContinueLoop
@@ -893,7 +940,7 @@ Func HandleDeath($iLastStepID)
     EndIf
 
     ; ============================================================
-    ; CAS 1 : RÉSURRECTION SUR PLACE (APPARENTE)
+    ; CAS 1 : RÉSURRÉCTION SUR PLACE (APPARENTE)
     ; ============================================================
     If $iRezSanctStepID = -1 Then
         Out("⚡ Résurrection sur place → reprise directe sans replay.")
@@ -916,29 +963,38 @@ Func HandleDeath($iLastStepID)
         ; 🔁 Détection téléportation brutale
         Local $aCurPos = GetPlayerXY()
         If $iCurrentStep >= 0 And $iCurrentStep < UBound($aSteps, 1) Then
-    Local $aStep[4] = [ _
-        $aSteps[$iCurrentStep][0], _ ; Numéro de l'étape
-        $aSteps[$iCurrentStep][1], _ ; Coordonnée X
-        $aSteps[$iCurrentStep][2], _ ; Coordonnée Y
-        $aSteps[$iCurrentStep][3]  _ ; Mode (ex: "move", "aggro")
-    ]
-Else
-    Out("ERREUR: $iCurrentStep hors limites → " & $iCurrentStep & @CRLF)
-EndIf
+		Local $aStep = [ _
+			$aSteps[$iCurrentStep][0], _
+			$aSteps[$iCurrentStep][1], _
+			$aSteps[$iCurrentStep][2], _
+			$aSteps[$iCurrentStep][3] _
+]
+
+        Else
+            Out("ERREUR: $iCurrentStep hors limites → " & $iCurrentStep & @CRLF)
+            Return $iCurrentStep
+        EndIf
 
         Local $fDist = Sqrt(($aCurPos[0] - $aStep[1])^2 + ($aCurPos[1] - $aStep[2])^2)
 
+       Global $g_iDeathLoopCount = $g_iDeathLoopCount + 1 ; valide mais rarement utile ici
+
         If $fDist > 3000 Then
-            Out("📍 Téléportation détectée post-rez (" & Int($fDist) & " unités) → re-traitement mort")
+            If $g_iDeathLoopCount > 2 Then
+                Out("❌ Trop de détections de téléportation post-rez. On continue malgré un écart de " & Int($fDist) & " unités.")
+                Return $iCurrentStep
+            EndIf
+            Out("📍 Téléportation détectée post-rez (" & Int($fDist) & " unités) → re-traitement mort (tentative " & $g_iDeathLoopCount & ")")
             Return HandleDeath($iLastStepID)
         EndIf
 
+        $g_iDeathLoopCount = 0
         Out("✅ Rez sur place confirmé comme valide.")
         Return $iCurrentStep
     EndIf
 
     ; ============================================================
-    ; CAS 2 : RÉSURRECTION AU SANCTUAIRE
+    ; CAS 2 : RÉSURRÉCTION AU SANCTUAIRE
     ; ============================================================
     Out("📍 Sanctuaire détecté → step " & $iRezSanctStepID)
 
@@ -974,7 +1030,7 @@ EndIf
     ; ------------------------------------------------------------
     ; Vérification post-reprise
     ; ------------------------------------------------------------
-    Out("🩺 Vérification post-reprise : stabilité...")
+    Out("🦥 Vérification post-reprise : stabilité...")
     If Not WaitForStabilization(6000) Then
         Out("💀 Mort détectée après reprise — relance HandleDeath()")
         Return HandleDeath($iLastStepID)
@@ -982,6 +1038,21 @@ EndIf
 
     Out("✅ Reprise stable confirmée.")
     Return $iCurrentStep
+EndFunc
+
+Func HandleHighDP()
+    $gRestartCount += 1
+    If $gRestartCount > 3 Then
+        Out("⚠️ Trop de tentatives. Arrêt du bot.")
+        Exit
+    EndIf
+
+    Out("💀 Malus à 60% atteint → retour à Gadd's Camp et redémarrage")
+    Travel("Gadd's Encampment")
+    Sleep(3000)
+
+    Initialize()
+    Main() ; ← redémarre depuis le début
 EndFunc
 
 
