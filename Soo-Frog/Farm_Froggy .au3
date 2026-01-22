@@ -494,6 +494,7 @@ DoStep(23, 345, -1485, "aggro")
 DoStep(24, -458, -3024, "aggro")
 DoStep(25, -525, -4092, "aggro")
 DoStep(26, -1104, -5308, "aggro")
+Sleep(4000)
 DoStep(27, -641, -6726, "aggro")
 DoStep(28, -586.44, -7221, "aggro")
 DoStep(29, -99.85, -8510, "aggro")
@@ -641,10 +642,10 @@ DoStep(99, 15116.40, -18733, "aggro")
     ; === Chest & Loot ===
     Out("Bogroot Chest")
     MoveTo(14982.66, -19122)
-				Sleep(Other_GetPing() + 500)
-				Agent_GoSignpost(Agent_TargetNearestGadget())
-				Sleep(Other_GetPing() + 500)
-				Agent_GoSignpost(Agent_TargetNearestGadget())
+	Sleep(Other_GetPing() + 500)
+	Agent_GoSignpost(Agent_TargetNearestGadget())
+	Sleep(Other_GetPing() + 500)
+	Agent_GoSignpost(Agent_TargetNearestGadget())
 
 
 
