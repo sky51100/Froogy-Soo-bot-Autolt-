@@ -977,7 +977,12 @@ Func HandleDeath($iLastStepID)
 
         Local $fDist = Sqrt(($aCurPos[0] - $aStep[1])^2 + ($aCurPos[1] - $aStep[2])^2)
 
-       Global $g_iDeathLoopCount = $g_iDeathLoopCount + 1 ; valide mais rarement utile ici
+      ; Une fois, dans l'initialisation globale
+Global $g_iDeathLoopCount = 0
+
+; Puis dans ta fonction (n'importe où après)
+$g_iDeathLoopCount += 1
+
 
         If $fDist > 3000 Then
             If $g_iDeathLoopCount > 2 Then
