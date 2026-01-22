@@ -82,7 +82,7 @@ While True
     If $BotRunning Then
 	Friend_SetOfflineStatus()	
 	Out("OFFLINE MODE")
-        MainFarm()
+		MainFarm()
     Else
         Sleep(1000)
     EndIf
@@ -97,7 +97,7 @@ Func MainFarm()
     GoToDungeon()
     TakeQuest()
     EnterFirstRun()
-    CombatLoop()
+	CombatLoop()
 EndFunc ;==> MainFarm
 
 ; =============================
@@ -610,15 +610,12 @@ Func LastStep()
     ; === Boss Door Opening ===
     PickupLoot()
     Out("Open Boss Door")
-MoveTo(17922.00, -6241)	
+			MoveTo(17888, -6243)
+				Sleep(Other_GetPing() + 500)
+    Agent_GoSignpost(Agent_TargetNearestGadget())
 
-    Sleep(500)
-	Agent_GoSignpost(GetNearestSignpostToAgent(-2))
-	Sleep(500)	
-	Agent_GoSignpost(GetNearestSignpostToAgent(-2))
-	Sleep(500)
-	Agent_GoSignpost(GetNearestSignpostToAgent(-2))
-	Sleep(500)
+				Sleep(Other_GetPing() + 500)
+				Agent_GoSignpost(Agent_TargetNearestGadget())
     Out("Door Opened")
     
     ; === Boss Waypoints ===    
@@ -644,9 +641,10 @@ DoStep(99, 15116.40, -18733, "aggro")
     ; === Chest & Loot ===
     Out("Bogroot Chest")
     MoveTo(14982.66, -19122)
-    Sleep(1000)
-    Agent_GoSignpost(GetNearestSignpostToAgent(-2))
-    Sleep(2000)
+				Sleep(Other_GetPing() + 500)
+				Agent_GoSignpost(Agent_TargetNearestGadget())
+				Sleep(Other_GetPing() + 500)
+				Agent_GoSignpost(Agent_TargetNearestGadget())
 
 
 
