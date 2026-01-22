@@ -557,7 +557,7 @@ Func Party_IsEntirePartyAlive()
     Next
 
     ; --- Vérifie les henchmen ---
-    Local $henchCount = Party_GetMyPartyInfo("ArrayHenchmanPartyMemberSize")
+    Local $henchCount = Party_GetMyPartyInfo("Ar9yMnTm4NSzvG9rrwjM2ec8xZgh1cafXH8")
     For $i = 1 To $henchCount
         Local $agentID = Party_GetMyPartyHenchmanInfo($i, "AgentID")
         If $agentID = 0 Then ContinueLoop
@@ -574,32 +574,36 @@ EndFunc
 ;  Gestion d’un step unique (avec détection de mort et reprise automatique)
 ;  Version corrigée : conversion step->index, pas d'enregistrement multiple
 ; ========================================================================
-Func DoStep($step, $x, $y, $mode = "aggro")
-    RegisterStep($step, $x, $y, $mode)
+Func DoStep($stepId, $x, $y, $mode="aggro")
+    RegisterStep($stepId, $x, $y, $mode)
 
-    ; === Farm de coffres si activé ===
-    If $EnableChestFarm And $ChestFarmActive And GetNumberOfLockpicks() > 0 Then
-        OpenNearbyChestsFiltered()
-    EndIf
+    Local $bResumedAfterDeath = False
 
-    ; === Vérification immédiate de mort ===
-    If Agent_GetAgentInfo(-2, "IsDead") Then
-        Out("💀 Mort détectée à l'étape " & $step & " → gestion de la mort...")
-        HandleDeath($step)
+    ; --- Mort détectée avant le move ---
+    If Agent_GetAgentInfo(-2,"IsDead") Then
+        Out("💀 Mort détectée à l'étape " & $stepId & " → gestion de la mort...")
+        $gAbortCurrentStep = False
+        HandleDeath($stepId)
+
+        If $gAbortCurrentStep Then
+            ConsoleWrite("🛑 Abort current DoStep(" & $stepId & ") - resuming from checkpoint" & @CRLF)
+            Return False
+        EndIf
 
         Local $t = TimerInit()
-        While Agent_GetAgentInfo(-2, "IsDead")
+        While Agent_GetAgentInfo(-2,"IsDead")
             Sleep(1000)
             If TimerDiff($t) > 90000 Then
-                Out("⏰ Timeout : toujours mort après 90s (étape " & $step & ")")
+                Out("⏰ Timeout : toujours mort après 90s (étape " & $stepId & ")")
                 Return False
             EndIf
         WEnd
-        Out("✅ Ressuscité, reprise du step " & $step)
+
+        $bResumedAfterDeath = True
+        Out("✅ Reprise du step " & $stepId & " après résurrection")
     EndIf
 
-
-    ; === 🧠 Nouvelle vérification : attendre que tout le groupe soit vivant ===
+    ; --- Attendre que tout le groupe soit vivant ---
     If Not Party_IsEntirePartyAlive() Then
         Out("☠️ Un ou plusieurs membres du groupe sont morts → attente de résurrection complète...")
         Local $waitParty = TimerInit()
@@ -613,11 +617,9 @@ Func DoStep($step, $x, $y, $mode = "aggro")
         Out("✅ Toute l'équipe est vivante → reprise du déplacement.")
     EndIf
 
-
     Local $stepTimer = TimerInit(), $customtimer = 5000
 
-
-    ; === Exécution du déplacement ===
+    ; --- Exécution du déplacement ---
     Switch $mode
         Case "aggro"
             AggroMoveToEx($x, $y)
@@ -627,34 +629,47 @@ Func DoStep($step, $x, $y, $mode = "aggro")
             MoveTo($x, $y)
     EndSwitch
 
-
     While True
         Sleep(10)
 
-        ; ⚰️ Mort détectée pendant le step
-        If Agent_GetAgentInfo(-2, "IsDead") Then
-            Out("⚰️ Mort détectée pendant le déplacement (step " & $step & ") → gestion de la mort...")
-            HandleDeath($step)
+        ; Mort pendant le déplacement
+        If Agent_GetAgentInfo(-2,"IsDead") Then
+            Out("⚰️ Mort détectée pendant le déplacement vers le step " & $stepId & " → gestion de la mort...")
+            $gAbortCurrentStep = False
+            HandleDeath($stepId)
+
+            If $gAbortCurrentStep Then
+                ConsoleWrite("🛑 Abort current DoStep(" & $stepId & ") after death - resuming from checkpoint" & @CRLF)
+                Return False
+            EndIf
 
             Local $wait = TimerInit()
-            While Agent_GetAgentInfo(-2, "IsDead")
+            While Agent_GetAgentInfo(-2,"IsDead")
                 Sleep(1000)
                 If TimerDiff($wait) > 90000 Then
-                    Out("⏰ Timeout : joueur toujours mort après 90s → abandon du step " & $step)
+                    Out("⏰ Timeout : joueur toujours mort après 90s → abandon du step " & $stepId)
                     Return False
                 EndIf
             WEnd
 
-            Out("✅ Reprise du step " & $step & " après résurrection")
+            Out("✅ Reprise du step " & $stepId & " après résurrection")
+
+            Switch $mode
+                Case "aggro"
+                    AggroMoveToEx($x, $y)
+                Case "clean"
+                    AggroMoveToEx2($x, $y)
+                Case Else
+                    MoveTo($x, $y)
+            EndSwitch
+
+            $stepTimer = TimerInit()
             ContinueLoop
         EndIf
 
-
-        ; ✅ Step atteint
+        ; Step atteint
         Local $curX = Agent_GetAgentInfo(-2, "X"), $curY = Agent_GetAgentInfo(-2, "Y")
         If ComputeDistance($curX, $curY, $x, $y) < 100 Then
-
-            ; 🔄 Vérifie à nouveau si tout le groupe est vivant avant de valider le step
             If Not Party_IsEntirePartyAlive() Then
                 Out("⏸️ Attente : validation du step suspendue, un membre est mort.")
                 Local $tCheck = TimerInit()
@@ -667,29 +682,39 @@ Func DoStep($step, $x, $y, $mode = "aggro")
                 WEnd
             EndIf
 
-            Out("✅ Step " & $step & " atteint (" & $x & "," & $y & ")")
-            $iCurrentStep = $step
+            Out("✅ Step " & $stepId & " atteint (" & $x & "," & $y & ")")
+            $iCurrentStep = $stepId
             Return True
         EndIf
 
-
-        ; 👊 En combat → reset du timer
+        ; combat => reset timer
         If GetNumberOfFoesInRangeOfAgent(-2, 400, $GC_I_AGENT_TYPE_LIVING, 1, "EnemyFilter") > 0 Then
             $stepTimer = TimerInit()
             ContinueLoop
         EndIf
 
-        ; ⏳ Timeout si inactif
+; --------------------------------------------------
+; 🗝️ Opportunistic Chest Opening (Option A)
+; --------------------------------------------------
+If $ChestFarmActive And GUICtrlRead($chkChestFarm) = $GUI_CHECKED Then
+    If TimerDiff($gLastChestCheck) > 750 Then
+        $gLastChestCheck = TimerInit()
+        OpenNearbyChestsFiltered()
+    EndIf
+EndIf
+
+
+        ; anti-stuck
         If TimerDiff($stepTimer) <= $customtimer Then ContinueLoop
         If Agent_GetAgentInfo(-2, "MoveX") <> 0 Or Agent_GetAgentInfo(-2, "MoveY") <> 0 Then
             $stepTimer = TimerInit()
             ContinueLoop
         EndIf
 
-        ; === Backtrack intelligent ===
-        Local $currIndex = _GetStepIndexByID($step)
+        ; backtrack intelligent
+        Local $currIndex = _GetStepIndexByID($stepId)
         If $currIndex = -1 Then
-            Out("⚠️ DoStep : stepID " & $step & " introuvable dans aSteps.")
+            Out("⚠️ DoStep : stepID " & $stepId & " introuvable dans aSteps.")
             Return False
         EndIf
 
@@ -699,21 +724,14 @@ Func DoStep($step, $x, $y, $mode = "aggro")
             Return False
         EndIf
 
-        Local $px = $aSteps[$prevIndex][1], $py = $aSteps[$prevIndex][2], _
-              $pmap = (UBound($aSteps, 2) > 4 ? $aSteps[$prevIndex][4] : Map_GetMapID())
-
-        If $pmap <> Map_GetMapID() Then
-            Out("⏭️ Step précédent sur une autre map → backtrack annulé.")
-            Return False
-        EndIf
-
+        Local $px = $aSteps[$prevIndex][1], $py = $aSteps[$prevIndex][2]
         Out("↩️ Recul vers le step précédent (step " & $aSteps[$prevIndex][0] & ") : " & $px & "," & $py)
         MoveTo($px, $py)
         PickupLoot()
         Sleep(1000)
 
-        Out("🔁 Nouvelle tentative du step " & $step)
-        Return DoStep($step, $x, $y, $mode)
+        Out("🔁 Nouvelle tentative du step " & $stepId)
+        Return DoStep($stepId, $x, $y, $mode)
     WEnd
 
     Return False
@@ -1094,10 +1112,10 @@ EndFunc
 ; 🕯️ Interaction torche / brasier
 ; ===========================================================
 Func _InteractSignpostSequence()
-	Agent_GoSignpost(GetNearestSignpostToAgent(-2))
-	Sleep(250)
-	Agent_GoSignpost(GetNearestSignpostToAgent(-2))
-	Sleep(250)
+				Sleep(Other_GetPing() + 500)
+    Agent_GoSignpost(Agent_TargetNearestGadget())
+					Sleep(Other_GetPing() + 500)
+    Agent_GoSignpost(Agent_TargetNearestGadget())
 EndFunc
 ; ===========================================================
 ; 📍 Séquence Braziers — Niveau 2 (Partie 1)
