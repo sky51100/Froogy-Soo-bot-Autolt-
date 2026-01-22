@@ -428,6 +428,7 @@ EndFunc ;==> EnterFirstRun
 
 
 Func FirstStage()
+
 If Not WaitForMapLoad($ID_SoO_lvl1) Then
 	Out("Erreur : échec de chargement de la carte SoO_lvl1" & @CRLF)
 		EnterFirstRun()
@@ -527,9 +528,10 @@ EndIf
     DoStep(37,-14050.64,-18215.56,"aggro")
     DoStep(38, -14215, -17456,"clean")
     DoStep(39, -16191, -16740,"clean")                                                                                                                                                         
-	
+	Sleep(1000)
     Out("Open torch chest")
     MoveTo(-14709, -16548)
+	Agent_TargetNearestGadget()
 				Sleep(Other_GetPing() + 500)
     Agent_GoSignpost(Agent_TargetNearestGadget())
 					Sleep(Other_GetPing() + 500)
@@ -571,7 +573,7 @@ PickupLootTorch()
  _GetBraziers_Lvl2_Part2()
 
     Out("Drop torch")
-    DropTorch()
+
     Sleep(500)
 
     DoStep(50, -6481, -2668, "aggro")
@@ -584,10 +586,7 @@ PickupLootTorch()
 
     Out("Open Door")
     MoveTo(-18725, -9171)	
-				Sleep(Other_GetPing() + 500)
-				Agent_GoSignpost(Agent_TargetNearestGadget())
-				Sleep(Other_GetPing() + 500)
-				Agent_GoSignpost(Agent_TargetNearestGadget())
+_InteractSignpostSequence()
 		
     Out("SecondStage : Check")
     Out("Going through portal")
@@ -597,11 +596,10 @@ EndFunc ;==> SecondStage
 
 ; === Troisième étage ===
 Func LastStep()
-    If Not WaitForMapLoad($ID_SoO_lvl3) Then
-        Out("Erreur : échec de chargement de la carte SoO_lvl3" & @CRLF)
-        MoveTo(-19300, -8200)
-        Return
-    EndIf
+    If Not WaitForMapLoad2($ID_SoO_lvl3, -19300, -8200) Then
+    MainFarm()
+    Return
+EndIf
     Out("✅Level 3 : Uploaded !")
     $ChestFarmActive = True
 
