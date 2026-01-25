@@ -577,7 +577,7 @@ PickupLootTorch()
     Out("Open Door")
     MoveTo(-18725, -9171)
 		Sleep(1000)
-	_InteractNearest()
+	_InteractNearestObject()
 		
     Out("SecondStage : Check")
     Out("Going through portal")
