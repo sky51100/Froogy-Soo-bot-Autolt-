@@ -111,7 +111,7 @@ While True
     If $BotRunning Then
 	Friend_SetOfflineStatus()	
 	Out("OFFLINE MODE")
-        MainFarm()
+		MainFarm()
     Else
         Sleep(1000)
     EndIf
@@ -483,13 +483,10 @@ EndIf
     DoStep(30, 14130, 6263, "aggro")
 
 
-    Out("Open Boss Door")
-			    MoveTo(15094.00, 5493)
+    Out("Open Door")
+			    MoveTo(15100.00, 5443)
 				Sleep(Other_GetPing() + 500)
-    Agent_GoSignpost(Agent_TargetNearestGadget())
-
-				Sleep(Other_GetPing() + 500)
-				Agent_GoSignpost(Agent_TargetNearestGadget())
+	_InteractNearestObject()
     Out("Door Opened")
     DoStep(31, 15331, 4637, "aggro")
     DoStep(32, 16494, 2662, "aggro")
@@ -531,29 +528,22 @@ EndIf
 	Sleep(1000)
     Out("Open torch chest")
     MoveTo(-14709, -16548)
-	Agent_TargetNearestGadget()
-				Sleep(Other_GetPing() + 500)
-    Agent_GoSignpost(Agent_TargetNearestGadget())
-					Sleep(Other_GetPing() + 500)
-    Agent_GoSignpost(Agent_TargetNearestGadget())
+_InteractNearestObject()
     Out("Pick up torch")
-	Sleep(500)
+	Sleep(1000)
 PickupLootTorch()
-PickupLootTorch()
+
 
 
 ;=====Before Fight=====
-	MoveTo(-11205,-17130)
-	DropTorch()
     DoStep(40, -9259, -17322, "aggro")
-	PickupLootTorch()
     DoStep(41, -10963, -14989, "move")
 	MoveTo(-11248,-14596)
  _GetBraziers_Lvl2_Part1()
 	
     Out("Drop torch")
 Party_CancelAll()	
-DropTorch()
+DropHeldTorch()
 
     Sleep(500)
     Out("Kill group")
@@ -585,8 +575,9 @@ PickupLootTorch()
 	DoStep(55, -18035, -9237, "aggro")
 
     Out("Open Door")
-    MoveTo(-18725, -9171)	
-_InteractSignpostSequence()
+    MoveTo(-18725, -9171)
+		Sleep(1000)
+	_InteractNearest()
 		
     Out("SecondStage : Check")
     Out("Going through portal")
@@ -596,10 +587,9 @@ EndFunc ;==> SecondStage
 
 ; === Troisième étage ===
 Func LastStep()
-    If Not WaitForMapLoad2($ID_SoO_lvl3, -19300, -8200) Then
-    MainFarm()
-    Return
-EndIf
+WaitForMapLoad($ID_SoO_lvl3)
+If Map_GetMapID() <> $ID_SoO_lvl3 Then Sleep(5000)
+
     Out("✅Level 3 : Uploaded !")
     $ChestFarmActive = True
 
@@ -652,10 +642,7 @@ Out("Go to take torch !")
         MoveTo(16111.00, 17556)
 Out("Waypoint 8")
         Out("Open torch chest")
-				Sleep(Other_GetPing() + 500)
-				Agent_GoSignpost(Agent_TargetNearestGadget())
-								Sleep(Other_GetPing() + 500)
-    Agent_GoSignpost(Agent_TargetNearestGadget())
+_InteractNearestObject()
         Sleep(1000)
         PickupLootTorch()
         PickupLootTorch()
@@ -670,12 +657,9 @@ Out("Waypoint 8")
 
         Out("Open dungeon door")
         Sleep(500)
-        MoveTo(-9284, 6360)
-				Sleep(Other_GetPing() + 500)
-				Agent_GoSignpost(Agent_TargetNearestGadget())
-				Sleep(Other_GetPing() + 500)
-				Agent_GoSignpost(Agent_TargetNearestGadget())
-
+        MoveTo(-9199.15, 6354.40)
+	_InteractNearestObject()
+	
         ; === Boss Fight Loop ===
         DoStep(72, -9926, 8007, "aggro")
         DoStep(73, -8490, 9370, "aggro")
@@ -688,10 +672,8 @@ Out("Waypoint 8")
         ;DoStep(79, -15967.96,17306, "clean")
         ; === Chest & Loot ===
         Out("Fendi Chest")
-        MoveTo(-15753, 17417)
-        MoveTo(-15743, 16832)
-		Sleep(Other_GetPing() + 500)
-		Agent_GoSignpost(Agent_TargetNearestGadget())
+        MoveTo(-15842.33,16949.23)
+		_InteractNearestObject()
         Sleep(2000)
 
         ; === Statistiques du run ===
