@@ -2068,7 +2068,12 @@ Out("🧹 Clearing enemies in compass range (" & $enemy1 & ")")
 EndFunc
 
 
-
+Func ChestFilter($aAgentPtr)
+	If Agent_GetAgentInfo($aAgentPtr, 'Type') <> 512 Then Return False
+	Local $lgadgetID = Agent_GetAgentInfo($aAgentPtr, 'GadgetID')
+		If $lgadgetID = 8141 Then Return True
+	Return False
+EndFunc	;==>ChestFilte
 
 
 ; Cherche Shandra dans la map courante
@@ -2091,25 +2096,6 @@ EndFunc
 Func GetNumberOfChestsInRangeOfAgent($aAgentID = -2, $aRange =$RANGE_SPIRIT, $aType = $GC_I_AGENT_TYPE_GADGET, $aReturnMode = 0, $aCustomFilter = "ChestFilter")
 	Return GetAgents($aAgentID, $aRange, $aType, $aReturnMode, $aCustomFilter)
 EndFunc	;==>GetNumberOfChestsInRangeOfAgent
-
-
-Func GetNumberOfLockpicks()
-	Local $ItemModelID, $LockpickQuantity = 0
-
-	For $i = 1 To 4
-		For $j = 1 To Item_GetBagInfo(Item_GetBagPtr($i), "Slots")
-			Local $lItemPtr = Item_GetItemBySlot($i, $j)
-			If Item_GetItemInfoByPtr($lItemPtr, "ItemID") = 0 Then ContinueLoop
-
-			$ItemModelID = Item_GetItemInfoByPtr($lItemPtr, "ModelID")
-			If $ItemModelID = $ITEM_ID_Lockpicks Then
-				$LockpickQuantity += Item_GetItemInfoByPtr($lItemPtr, "Quantity")
-			EndIf
-		Next
-	Next
-
-	Return $LockpickQuantity
-EndFunc
 
 
 Func OpenNearbyChestsFiltered($range = 1000)
