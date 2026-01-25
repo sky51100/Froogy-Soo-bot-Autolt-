@@ -2112,63 +2112,83 @@ EndFunc
 
 
 Func OpenNearbyChestsFiltered($range = 1000)
-	If GetIsDead(-2) Then Return False
+    If Agent_GetAgentInfo(-2,"IsDead") Then Return False
 
-	Local $IsThereAChest = GetNumberOfChestsInRangeOfAgent(-2, $RANGE_SPIRIT, $GC_I_AGENT_TYPE_GADGET, 0, "ChestFilter")
-	If $IsThereAChest <= 0 Then Return False ; Aucun coffre proche
+    Local $chest
+    Local $xchest
+    Local $ychest
+    Local $aItemPtr
+    Local $canpickup
+    Local $IsThereAChest
 
-	; === Coffres détectés ===
-	Out("How many chests are nearby: " & $IsThereAChest)
+    ; --- Scan des coffres ---
+    $IsThereAChest = GetNumberOfChestsInRangeOfAgent(-2, $range, $GC_I_AGENT_TYPE_GADGET, 0, "ChestFilter")
+ ;   Out("How many Chests are nearby?: " & $IsThereAChest)
+    Sleep(16)
 
-	Local $NumberLockPick = GetNumberOfLockpicks()
-	Out("Lockpicks in bag: " & $NumberLockPick)
+    If $IsThereAChest = 0 Then Return False
+    If Agent_GetAgentInfo(-2,"IsDead") Then Return False
 
-	If $NumberLockPick <= 0 Then
-		Out("No lockpicks left! Skipping chest.")
-		Return False
-	EndIf
+    ; --- Coffre le plus proche ---
+    $chest = GetNearestChestToAgent(-2, $range, $GC_I_AGENT_TYPE_GADGET, 1, "ChestFilter")
+    If $chest = 0 Then Return False
 
-	Local $chest = GetNearestChestToAgent(-2, $RANGE_SPIRIT, $GC_I_AGENT_TYPE_GADGET, 1, "ChestFilter")
-	If $chest = 0 Then Return False
+    $xchest = Agent_GetAgentInfo($chest, "X")
+    $ychest = Agent_GetAgentInfo($chest, "Y")
 
-	Local $xchest = Agent_GetAgentInfo($chest, "X")
-	Local $ychest = Agent_GetAgentInfo($chest, "Y")
+    ; --------------------------------------------------
+    ; ⛔ Skip coffre déjà traité
+    ; --------------------------------------------------
+    For $i = 0 To UBound($xChestOldAr) - 1
+        If ComputeDistance($xchest, $ychest, $xChestOldAr[$i], $yChestOldAr[$i]) < 120 Then
+            ; coffre déjà tenté → on ignore proprement
+            Return False
+        EndIf
+    Next
 
-	; Vérifie si déjà ouvert
-	Local $minchestdistance = 10000000
-	For $i = 0 To UBound($xChestOldAr) - 1
-		Local $chestdistance = ComputeDistance($xchest, $ychest, $xChestOldAr[$i], $yChestOldAr[$i])
-		If $chestdistance < $minchestdistance Then $minchestdistance = $chestdistance
-	Next
+    If Agent_GetAgentInfo(-2,"IsDead") Then Return False
 
-	If $minchestdistance < 100 Then
-		Out("You already opened that chest, skipping it.")
-		Return True
-	EndIf
+    ; --- Aller au coffre ---
+    Agent_GoSignpost($chest)
+    Sleep(250)
+    If Agent_GetAgentInfo(-2,"IsDead") Then Return False
 
-	; Mémorise le coffre
-	ReDim $xChestOldAr[UBound($xChestOldAr) + 1]
-	ReDim $yChestOldAr[UBound($yChestOldAr) + 1]
-	$xChestOldAr[UBound($xChestOldAr) - 1] = $xchest
-	$yChestOldAr[UBound($yChestOldAr) - 1] = $ychest
+    ; --- Tentative d'ouverture ---
+    Item_OpenChest()
+	Out("Open Chest")
+    Sleep(250)
 
-	; === Ouverture du coffre ===
-	Agent_GoSignpost($chest)
-	Sleep(200)
-	Item_OpenChest()
-	Sleep(300)
+    ; --------------------------------------------------
+    ; ✅ Mémoriser le coffre APRES tentative d'ouverture
+    ; --------------------------------------------------
+    ReDim $xChestOldAr[UBound($xChestOldAr) + 1]
+    ReDim $yChestOldAr[UBound($yChestOldAr) + 1]
+    $xChestOldAr[UBound($xChestOldAr) - 1] = $xchest
+    $yChestOldAr[UBound($yChestOldAr) - 1] = $ychest
 
-	; === Loot ===
-	Local $aItemPtr = GetNearestItemToAgent(-2, $range)
-	Local $canpickup = CanPickUp($aItemPtr)
-	If $canpickup Then
-		MoveTo($xchest, $ychest, 20)
-		PickUpLoot()
-		Sleep(200)
-	EndIf
+    ; --- Détection du loot ---
+    $aItemPtr = GetNearestItemToAgent(-2, $range)
+    Sleep(16)
 
-	UpdateStatistics()
-	Return True
+    ; --- Pickup si autorisé ---
+    $canpickup = CanPickUp($aItemPtr)
+    Sleep(100)
+
+    If Agent_GetAgentInfo(-2,"IsDead") Then Return False
+
+    If $canpickup Then
+        If Agent_GetAgentInfo(-2,"IsDead") Then Return False
+        MoveTo($xchest, $ychest, 20)
+        If Agent_GetAgentInfo(-2,"IsDead") Then Return False
+        PickUpLoot()
+        Sleep(250)
+        If Agent_GetAgentInfo(-2,"IsDead") Then Return False
+    EndIf
+
+    ; --- Mise à jour des stats ---
+    UpdateStatistics()
+
+    Return True
 EndFunc
 
 
@@ -2183,7 +2203,7 @@ Func GetNearestItemToAgent($aAgentID = -2, $aRange = $RANGE_COMPASS)
         Local $aItemPtr = $lAgentArray[$i]
         Local $aItemAgentID = Item_GetItemInfoByPtr($aItemPtr, "AgentID")
 
-        If GetIsDead(-2) Then Return
+        If Agent_GetAgentInfo(-2,"IsDead") Then Return
         If $aItemAgentID = 0 Then ContinueLoop ; If Item is not on the ground
 		Local $aDistance = GetDistance($aItemAgentID, $aAgentID)
 		If $aDistance > $aRange+100 Then ContinueLoop ; If Item is out of range
