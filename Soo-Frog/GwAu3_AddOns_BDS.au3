@@ -390,9 +390,9 @@ Func Agent_TargetNearestGadget($a_f_MaxDistance = 800)
 
     If $l_i_NearestID > 0 Then
         Agent_ChangeTarget($l_i_NearestID)
-        Log_Debug("Targeted nearest gadget: " & $l_i_NearestID & " at distance: " & $l_f_NearestDistance, "AgentMod", $g_h_EditText)
+        Out("Targeted nearest gadget: " & $l_i_NearestID & " at distance: " & $l_f_NearestDistance, "AgentMod", $g_h_EditText)
     Else
-        Log_Debug("No gadget found within range: " & $a_f_MaxDistance, "AgentMod", $g_h_EditText)
+        Out("No gadget found within range: " & $a_f_MaxDistance, "AgentMod", $g_h_EditText)
     EndIf
 
     Return $l_i_NearestID
@@ -998,79 +998,79 @@ Func HandleDeath($lastStep)
 
 EndFunc
 
+; #FUNCTION# ====================================================================================================================
+; Name ..........: GetNearestInteractable
+; Description ...: Scanne les agents de type interactif (portes, coffres, brasiers) et retourne l’ID du plus proche.
+; ===============================================================================================================================
+Func GetNearestInteractable($a_f_MaxDistance = 200)
+	Local $l_i_MyID = Agent_GetMyID()
+	Local $l_i_MaxAgents = Agent_GetMaxAgents()
+	Local $iNearestID = 0
+	Local $fNearestDist = $a_f_MaxDistance
 
+	For $i = 1 To $l_i_MaxAgents
+		Local $pPtr = Agent_GetAgentPtr($i)
+		If Not IsPtr($pPtr) Then ContinueLoop
 
-Func Debug_LogGadgets($aRange = 2000)
-	Local $lPlayerID = Agent_GetMyID()
-	If $lPlayerID = 0 Then
-		Out("❌ Impossible de récupérer l'agent joueur.")
-		Return
-	EndIf
+		Local $iType = Agent_GetAgentInfo($i, "Type")
+		If $iType <> 0x200 And $iType <> 0x400 Then ContinueLoop ; Coffres, portes, brasiers
 
-	Local $lPlayerX = Agent_GetAgentInfo($lPlayerID, "X")
-	Local $lPlayerY = Agent_GetAgentInfo($lPlayerID, "Y")
-
-	Out("🧩 [DEBUG] Liste des gadgets dans un rayon de " & $aRange & " autour du joueur (" & _
-		Round($lPlayerX) & ", " & Round($lPlayerY) & ")")
-
-	Local $lAgents = Agent_GetAgentArray($GC_I_AGENT_TYPE_GADGET)
-	If Not IsArray($lAgents) Then
-		Out("❌ Aucun agent trouvé.")
-		Return
-	EndIf
-
-	Local $visible = 0
-	For $i = 1 To $lAgents[0]
-		Local $ptr = $lAgents[$i]
-		If $ptr = 0 Then ContinueLoop
-
-		Local $modelID = Agent_GetAgentInfo($ptr, "GadgetID") ; ✅ CORRECTION
-		Local $x = Agent_GetAgentInfo($ptr, "X")
-		Local $y = Agent_GetAgentInfo($ptr, "Y")
-		Local $id = Agent_GetAgentInfo($ptr, "ID")
-
-		Local $dist = Sqrt(($lPlayerX - $x)^2 + ($lPlayerY - $y)^2)
-		If $dist <= $aRange Then
-			$visible += 1
-			Out(StringFormat("🔹 Gadget #%d | ID: %d | GadgetID: %d | Pos: (%.0f, %.0f) | Dist: %.0f", _
-				$i, $id, $modelID, $x, $y, $dist))
+		Local $fDist = Agent_GetDistance($i, $l_i_MyID)
+		If $fDist < $fNearestDist Then
+			$fNearestDist = $fDist
+			$iNearestID = $i
 		EndIf
 	Next
 
-	Out("📊 Total gadgets visibles dans la zone: " & $visible)
+	Return $iNearestID
 EndFunc
 
 
 
+; #FUNCTION# ====================================================================================================================
+; Name ..........: _InteractNearestObject
+; Description ...: Cible et interagit avec l'objet interactif le plus proche (porte, coffre, brasier).
+; ===============================================================================================================================
+Func _InteractNearestObject($a_f_MaxDistance = 200)
+	Local $iID = GetNearestInteractable($a_f_MaxDistance)
+	If $iID <= 0 Then
+		Out("❌ Aucun objet interactif trouvé dans " & $a_f_MaxDistance & " unités.")
+		Return False
+	EndIf
 
-; ===========================================================
-; 🕯️ Interaction torche / brasier
-; ===========================================================
-Func _InteractSignpostSequence()
-    Local $id = GetNearestBrazier()
-    If $id <= 0 Then
-        Out("❌ Aucun brasier trouvé.")
-        Return False
-    EndIf
+	Local $fDist = Agent_GetDistance(-2, $iID)
+	Out("📍 Objet interactif détecté — ID: " & $iID & " | Distance: " & Int($fDist))
 
-    Local $dist = Agent_GetDistance(-2, $id)
-    Out("🔥 Brasier détecté — ID: " & $id & " | Distance: " & Int($dist))
+	Agent_ChangeTarget($iID)
+	Sleep(Other_GetPing() + 300)
+	Agent_GoSignpost($iID)
+	Sleep(Other_GetPing() + 300)
+	Agent_GoSignpost($iID)
 
-    If $dist > 350 Then
-        Out("⚠️ Trop loin pour l’interaction.")
-        Return False
-    EndIf
-
-    Agent_ChangeTarget($id)
-    Sleep(Other_GetPing() + 300)
-    Agent_GoSignpost($id)
-    Sleep(Other_GetPing() + 300)
-    Agent_GoSignpost($id)
-
-    Return True
+	Return True
 EndFunc
 
 
+Func Agent_LogNearbyAgents($a_f_MaxDistance = 200)
+	Local $l_i_MyID = Agent_GetMyID()
+	Local $l_i_MaxAgents = Agent_GetMaxAgents()
+	Out("📡 Scanning agents within " & $a_f_MaxDistance & " units...")
+
+	For $i = 1 To $l_i_MaxAgents
+		Local $l_p_Ptr = Agent_GetAgentPtr($i)
+		If Not IsPtr($l_p_Ptr) Then ContinueLoop
+
+		Local $l_f_Dist = Agent_GetDistance($i, $l_i_MyID)
+		If $l_f_Dist > $a_f_MaxDistance Then ContinueLoop
+
+		Local $l_i_Type = Agent_GetAgentInfo($i, "Type")
+		Local $l_i_ModelID = Agent_GetAgentInfo($i, "ModelID")
+		Local $l_i_NameID = Agent_GetAgentInfo($i, "NameID")
+
+		Out(StringFormat("🧱 ID: %-4d | Type: 0x%03X | ModelID: %-6d | Dist: %-6.1f | NameID: %d", _
+			$i, $l_i_Type, $l_i_ModelID, $l_f_Dist, $l_i_NameID))
+	Next
+EndFunc
 
 ; ===========================================================
 ; 📍 Séquence Braziers — Niveau 2 (Partie 1)
@@ -1079,28 +1079,28 @@ Func _GetBraziers_Lvl2_Part1()
 
 	Out("🔥 Allumage de la torche — premier brasier")
 	MoveTo(-11303, -14596)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 
 	Out("➡️ Entrée dans la Torch Room")
 	MoveTo(-10033, -12701)
 
 	Out("🔥 Go to Brasier 1")
 	MoveTo(-11019, -11550)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 
 	Out("🔥 Go to Brasier 2")
 	MoveTo(-9028, -9021)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 	
 Party_CommandAll(-11248, -14596)
 
 	Out("🔥 Go to Brasier 3")
 	MoveTo(-6805, -11511)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 
 	Out("🔥 Go to Brasier 4")
 	MoveTo(-8984, -13842)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 Party_CancelAll()
 	Out("🏁 Séquence terminée — Niveau 2 / Partie 1")
 EndFunc
@@ -1115,18 +1115,18 @@ Func _GetBraziers_Lvl2_Part2()
 
 	Out("🔥 Go to Brasier initial")
 	MoveTo(-3717, -4254)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 
 	Out("🔥 Go to Brasier 1")
 	MoveTo(-8251, -3240)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 
 	Out("🔥 Go to Brasier 2")
 	MoveTo(-8278, -1670)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 
 	Out("🏁 Séquence terminée — Niveau 2 / Partie 2")
-    DropTorch()	
+    DropHeldTorch()	
 EndFunc
 
 
@@ -1139,50 +1139,50 @@ Func _GetBraziers_Lvl3()
 
 	Out("🔥 Go to Brasier Initial")
 	MoveTo(15692, 17111)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 	
 	Out("🔥 Go to Brasier 1")
 	MoveTo(12969, 19842) 
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 	
 	MoveTo(9918.64, 19108)
 	Out("🔥 Go to Brasier 2")
 	MoveTo(8236, 16950)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 		
 	Out("🔥 Go to Brasier 3")
 	MoveTo(5549, 9920)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 	
 	Out("🔥 Go to Brasier 4")
 	MoveTo(-536, 6109)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 	
 	Out("🔥 Go to Brasier 5")
 	MoveTo(-3814, 5599)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 	
 	Out("🔥 Go to Brasier 6")
 	MoveTo(-4959, 7558)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 	
 	Out("🔥 Go to Brasier 7")
 	MoveTo(-7532, 4536)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 	
 	Out("🔥 Go to Brasier 8")
 	MoveTo(-8814, 3727)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 		
 	Out("🔥 Go to Brasier 9")
 	MoveTo(-11044, 482)
-	_InteractSignpostSequence()
+	_InteractNearestObject()
 	
 		Out("🔥 Go to Brasier 10")
 		MoveTo(-12621,2948)
-		_InteractSignpostSequence()	
+		_InteractNearestObject()	
 	Out("🏁 Séquence terminée — Niveau 3")
-	DropTorch()
+	DropHeldTorch()
 EndFunc
 
 
@@ -1442,7 +1442,7 @@ Func MoveTo($aX, $aY, $aRandom = 60, $aTimeout = 30000)
         $curY = Agent_GetAgentInfo(-2, "Y")
 
         ; Vérifie si bloqué
-        If ComputeDistance($curX, $curY, $lastX, $lastY) < 10 Then
+        If ComputeDistance($curX, $curY, $lastX, $lastY) < 100 Then
             $lBlocked += 1
             If $lBlocked > 2 Then
                 $lDestX = $baseDestX + Random(-$aRandom, $aRandom)
@@ -2091,25 +2091,6 @@ Func GetNumberOfChestsInRangeOfAgent($aAgentID = -2, $aRange =$RANGE_SPIRIT, $aT
 	Return GetAgents($aAgentID, $aRange, $aType, $aReturnMode, $aCustomFilter)
 EndFunc	;==>GetNumberOfChestsInRangeOfAgent
 
-Func ChestFilter($aAgentPtr)
-	If Agent_GetAgentInfo($aAgentPtr, 'Type') <> 512 Then Return False
-	Local $lgadgetID = Agent_GetAgentInfo($aAgentPtr, 'GadgetID')
-		If $lgadgetID = 8141 Then Return True
-	Return False
-EndFunc	;==>ChestFilter
-
-Func IsBrazier($aAgentPtr)
-    If Agent_GetAgentInfo($aAgentPtr, "Type") <> $GC_I_AGENT_TYPE_GADGET Then Return False
-    Local $id = Agent_GetAgentInfo($aAgentPtr, "GadgetID")
-    Return ($id = 9169 Or $id = 9170)
-EndFunc
-
-Func GetNearestBrazier()
-    Local $ptr = GetAgents(-2, 600, $GC_I_AGENT_TYPE_GADGET, 1, "IsBrazier")
-    If $ptr <= 0 Then Return 0
-    Return Agent_GetAgentInfo($ptr, "ID")
-EndFunc
-
 
 Func GetNumberOfLockpicks()
 	Local $ItemModelID, $LockpickQuantity = 0
@@ -2640,13 +2621,12 @@ Func PickUpLootTorch()
     Next
 EndFunc   ;==>PickUpLoot
 
-Func DropTorch()
-	; 0xCD = ActionID (Drop Held Item)
-	; 0x1E = ActionFlag (type de l’action)
-	Core_PerformAction(0xCD, 0x1E)
-	Out("✅ Torche lâchée avec succès.")
+Func DropHeldTorch()
+	Out("🔥 Drop via Core_ControlAction...")
+	Core_ControlAction($GC_I_CONTROL_ACTION_DROP_ITEM)
 	Return True
 EndFunc
+
 
 ;~ Description: Test if an Item agent exists.
 Func GetItemAgentExists($aItemAgentID)
