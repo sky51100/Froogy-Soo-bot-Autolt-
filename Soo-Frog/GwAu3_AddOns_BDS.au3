@@ -1,6 +1,7 @@
 #include-once
 #Region Constants
 ; ==== Constants ====
+Global $gLastChestCheck = 0
 Global $ChestFarmActive = False
 Global Enum $DIFFICULTY_NORMAL, $DIFFICULTY_HARD
 Global Enum $INSTANCETYPE_OUTPOST, $INSTANCETYPE_EXPLORABLE, $INSTANCETYPE_LOADING
