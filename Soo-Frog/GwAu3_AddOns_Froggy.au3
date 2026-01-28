@@ -1537,7 +1537,9 @@ EndIf
 
     Until $lBlocked > 10
 
-    Out("❌ Position non atteinte : (dist=" & Round($distToTarget,1) & ")")
+Local $distToTarget = ComputeDistance($curX, $curY, $baseDestX, $baseDestY)
+Out("❌ Position non atteinte : (dist=" & Round($distToTarget, 1) & ")")
+
     Return False
 EndFunc
 
