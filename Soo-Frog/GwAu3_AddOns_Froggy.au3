@@ -1436,6 +1436,7 @@ Func MoveToSafe($aX, $aY, $aTolerance = 50, $aTimeout = 30000)
 
     Local $lDestX = $aX
     Local $lDestY = $aY
+
     Local $lBlocked = 0
     Local $lAttempts = 0
 
@@ -1447,14 +1448,17 @@ Func MoveToSafe($aX, $aY, $aTolerance = 50, $aTimeout = 30000)
     Local $lastX = Agent_GetAgentInfo(-2, "X")
     Local $lastY = Agent_GetAgentInfo(-2, "Y")
 
-    ;Out("➡️ MoveToExactSafe → (" & $aX & "," & $aY & ") tol=" & $aTolerance)
+    Local $curX = $lastX
+    Local $curY = $lastY
+    Local $distToTarget = 0
+    Local $deltaMove = 0
 
     Map_Move($lDestX, $lDestY, 0)
 
     Do
         Sleep(200)
 
-        ; ❌ Sécurité
+        ; ❌ Sécurités globales
         If GetIsDead(-2) Or GetPartyDead() Then Return False
         If TimerDiff($tGlobal) > $aTimeout Then ExitLoop
 
@@ -1463,18 +1467,18 @@ Func MoveToSafe($aX, $aY, $aTolerance = 50, $aTimeout = 30000)
         If $lMapType <> $lMapTypeOld Then ExitLoop
 
         ; 📍 Position actuelle
-        Local $curX = Agent_GetAgentInfo(-2, "X")
-        Local $curY = Agent_GetAgentInfo(-2, "Y")
-        Local $distToTarget = ComputeDistance($curX, $curY, $lDestX, $lDestY)
-        Local $deltaMove = ComputeDistance($curX, $curY, $lastX, $lastY)
+        $curX = Agent_GetAgentInfo(-2, "X")
+        $curY = Agent_GetAgentInfo(-2, "Y")
 
-        ; ✅ Position atteinte
+        $distToTarget = ComputeDistance($curX, $curY, $lDestX, $lDestY)
+        $deltaMove = ComputeDistance($curX, $curY, $lastX, $lastY)
+
+        ; ✅ Destination atteinte
         If $distToTarget <= $aTolerance Then
-            ;Out("✅ Position atteinte (dist=" & Round($distToTarget,1) & ")")
             Return True
         EndIf
 
-        ; ⚔️ Combat → on attend, pas de blocage
+        ; ⚔️ Combat → pas de blocage
         If GetNumberOfFoesInRangeOfAgent(-2, 1000, $GC_I_AGENT_TYPE_LIVING, 1, "EnemyFilter") > 0 Then
             $tLastCombat = TimerInit()
             $tStuck = TimerInit()
@@ -1482,41 +1486,36 @@ Func MoveToSafe($aX, $aY, $aTolerance = 50, $aTimeout = 30000)
             ContinueLoop
         EndIf
 
-        ; 🕒 Post-combat (10s)
+        ; 🕒 Délai post-combat
         If $tLastCombat <> 0 And TimerDiff($tLastCombat) < 10000 Then
             $tStuck = TimerInit()
             ContinueLoop
         EndIf
-		
-		; 🔧 Interaction gadget → ignorer la logique de blocage
-Local $target = Agent_GetAgentInfo(-2, "Target")
-If $target <> 0 And Agent_GetAgentInfo($target, "Type") = $AGENT_TYPE_GADGET Then
-    $tStuck = TimerInit()
-    $lBlocked = 0
-    ContinueLoop
-EndIf
 
-
-        ; 🧍 Interaction PNJ → pause logique de blocage
+        ; 🎯 Interaction PNJ / Gadget → ignorer blocage
         Local $target = Agent_GetAgentInfo(-2, "Target")
-        If $target <> 0 And Agent_GetAgentInfo($target, "Type") = $AGENT_TYPE_NPC Then
-            $tStuck = TimerInit()
-            ContinueLoop
+        If $target <> 0 Then
+            Local $tType = Agent_GetAgentInfo($target, "Type")
+            If $tType = $AGENT_TYPE_NPC Or $tType = $AGENT_TYPE_GADGET Then
+                $tStuck = TimerInit()
+                $lBlocked = 0
+                ContinueLoop
+            EndIf
         EndIf
 
-        ; 🚫 Détection de blocage réel (pas de progrès)
+        ; 🚫 Blocage réel = pas de progrès
         If $deltaMove < 30 Then
-            If TimerDiff($tStuck) > 2000 Then
+            If TimerDiff($tStuck) > 1500 Then
                 $lBlocked += 1
                 Out("⚠️ Bloqué (" & $lBlocked & ") dist=" & Round($distToTarget,1))
 
-                ; 🔁 Déblocage latéral (anti body-block Chandra)
+                ; 🔁 Déblocage latéral
                 Local $sideX = Random(-200, 200)
                 Local $sideY = Random(-200, 200)
                 Map_Move($curX + $sideX, $curY + $sideY, 0)
-                Sleep(400)
+                Sleep(300)
 
-                ; 🎯 Retour vers la vraie cible
+                ; 🎯 Reprise vers la cible
                 Map_Move($lDestX, $lDestY, 0)
 
                 $tStuck = TimerInit()
@@ -1526,7 +1525,7 @@ EndIf
             $lBlocked = 0
         EndIf
 
-        ; 🔄 Réémission périodique du Move
+        ; 🔄 Réémission périodique
         $lAttempts += 1
         If Mod($lAttempts, 20) = 0 Then
             Map_Move($lDestX, $lDestY, 0)
@@ -1537,11 +1536,10 @@ EndIf
 
     Until $lBlocked > 10
 
-Local $distToTarget = ComputeDistance($curX, $curY, $baseDestX, $baseDestY)
-Out("❌ Position non atteinte : (dist=" & Round($distToTarget, 1) & ")")
-
+    Out("❌ Position non atteinte : (dist=" & Round($distToTarget, 1) & ")")
     Return False
 EndFunc
+
 
 
 ; ======================================================================================================================
